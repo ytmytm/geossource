@@ -1,0 +1,174 @@
+
+;GEOS Kernal - booter code
+;reassembled by Maciej 'YTM/Alliance' Witkowiak
+;19-3-99
+
+;This part of code is called after loading GEOS KERNAL into memory
+;it setups all system variables and vectors. It tries to reboot from
+;REU if possible.
+;It sets a boot-disk flag on current disk.
+;It also finds and executes all auto-executables found on current
+;disk.
+;After all these actions it jumps into EnterDeskTop function.
+
+		SEI
+		CLD
+		LDX #$ff
+		TXS
+		#LoadB CPU_DATA, $30
+		LDA #<_NMIHandler
+		STA $fffa
+		STA $fffc
+		STA $fffe
+		LDA #>_NMIHandler
+		STA $fffb
+		STA $fffd
+		STA $ffff
+		JSR ClrScr
+		JSR i_FillRam
+		.word $0500
+		.word dirEntryBuf
+		.byte 0
+		JSR FirstInit
+		JSR MOUSE_JMP
+		#LoadB interleave, currentInterleave
+		LDY curDevice
+		LDA #1
+		STA _driveType,y
+		STY curDrive
+		LDX #0
+		LDA $5f0f
+		CMP #$13
+		BNE Boot2
+		LDY #3
+Boot1		LDA $5f06,y	;5050
+		CMP BootTest,y
+		BNE Boot2
+		DEY
+		BPL Boot1
+		LDX #$80
+Boot2		TXA		;505d
+		STA firstBoot
+		BEQ Boot4
+		LDY #2
+Boot3		LDA $5f18,y	;5065
+		STA year,y
+		DEY
+		BPL Boot3
+		LDA $5f12
+		STA sysRAMFlg
+		#bra Boot6
+Boot4		#LoadB CPU_DATA, $35	;5077
+		LDA cia1base+15
+		AND #%01111111
+		STA cia1base+15
+		#LoadB cia1base+11, %10000001
+		LDA #0
+		STA cia1base+10
+		STA cia1base+9
+		STA cia1base+8
+		#LoadB CPU_DATA, $30
+		#LoadB year, currentYear
+		#LoadB month, currentMonth
+		#LoadB day, currentDay
+		LDX #7
+		LDA #$bb
+Boot5		STA A8FE8,x	;50aa
+		DEX
+		BPL Boot5
+		#LoadB A8FF0, $bf
+		NOP
+Boot6		LDA #>_IRQHandler	;50b6
+		STA $ffff
+		LDA #<_IRQHandler
+		STA $fffe
+		JSR OpenDisk
+		JSR GetDirHead
+		#bnex Boot7
+		LDA #"K"
+		CMP curDirHead+OFF_GS_DTYPE
+		BEQ Boot7
+		STA curDirHead+OFF_GS_DTYPE
+		JSR PutDirHead
+Boot7		LDA bootSec		;50d9
+		STA r1H
+		LDA bootTr
+		STA r1L
+		LDA bootOffs
+		#addv $20
+		STA bootOffs
+		BNE Boot10
+Boot8		LDA bootSec2		;50ee
+		STA r1H
+		LDA bootTr2
+		STA r1L
+		BNE Boot10
+		LDA NUMDRV
+		BNE Boot9
+		INC NUMDRV
+Boot9		LDA #>_EnterDeskTop	;5102
+		STA EnterDeskTop+2
+		LDA #<_EnterDeskTop
+		STA EnterDeskTop+1
+		JMP _EnterDeskTop
+Boot10		LDA r1H 		;510f
+		STA bootSec
+		LDA r1L
+		STA bootTr
+		#LoadW r4, diskBlkBuf
+		JSR GetBlock
+		#bnex Boot9
+		LDA diskBlkBuf+1
+		STA bootSec2
+		LDA diskBlkBuf
+		STA bootTr2
+Boot101 	LDY bootOffs		;5133
+		LDA diskBlkBuf+2,y
+		BEQ Boot11
+		LDA diskBlkBuf+$18,y
+		CMP #AUTO_EXEC
+		BEQ Boot12
+Boot11		LDA bootOffs		;5142
+		#addv $20
+		STA bootOffs
+		BNE Boot101
+		BEQ Boot8
+Boot12		LDX #0			;514f
+Boot13		LDA diskBlkBuf+2,y	;5151
+		STA dirEntryBuf,x
+		INY
+		INX
+		CPX #30
+		BNE Boot13
+		#LoadW r9, dirEntryBuf
+		#LoadB r0, 0
+		LDA #>_BootEnterDeskTop
+		STA EnterDeskTop+2
+		LDA #<_BootEnterDeskTop
+		STA EnterDeskTop+1
+		LDA #>_EnterDeskTop-1
+		PHA
+		LDA #<_EnterDeskTop-1
+		PHA
+		LDA #>_FirstInit-1
+		PHA
+		LDA #<_FirstInit-1
+		PHA
+		JMP LdApplic
+
+_BootEnterDeskTop			;5182
+		SEI
+		CLD
+		LDX #$ff
+		TXS
+		JSR _DoFirstInitIO
+		JSR UNK_1_1
+		JMP Boot8
+
+bootTr		.byte 0 	;5190
+bootSec 	.byte 0 	;5191
+bootTr2 	.byte DIR_TRACK ;5192
+bootSec2	.byte 1 	;5194
+bootOffs	.byte $e0
+
+bootTest	.text "GEOS"	;5195

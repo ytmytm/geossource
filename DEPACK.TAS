@@ -1,0 +1,98 @@
+
+depack .macro
+
+mem_low=$334
+
+.if \1
+                .word syso,\2
+                .text $9e,\3,0
+syso            .byte 0,0
+.fi
+
+                sei
+                ldx #$ff
+                txs
+                lda #$b
+                sta $d011
+                lda #$1
+                sta $d030
+                lda #$34
+                sta $1
+
+                ldx #enddep-maindep
+lp1             lda maindp-1,x
+                sta @w $fc-1,x
+                dex
+                bne lp1
+                jmp startdep
+maindp
+.logical $fc
+maindep         .word mem_low+\4,\5
+
+startdep        ldx #(>\4)+((<\4)!=0)
+                ldy #0
+dp1             lda packed_data,y
+dp2             sta mem_low,y
+                iny
+                bne dp1
+                inc dp1+2
+                inc dp2+2
+                dex
+                bne dp1
+dpck            lda $fc
+                cmp #<mem_low
+                bne dp3
+                lda $fd
+                cmp #>mem_low
+                bne dp3
+                lda #$37
+                sta $1
+                lda #0
+                sta $d030
+                lda #$1b
+                sta $d011
+                cli
+                jmp \8
+dp3             jsr get
+                cmp #\6
+                beq dp4
+                cmp #\7
+                beq dp5
+dp7             jsr put
+                jmp dpck
+dp4             jsr get
+                bne dp6
+                lda #\6
+                jmp dp7
+dp6             tax
+                tya
+dp8             jsr put
+                dex
+                bne dp8
+                jmp dpck
+dp5             jsr get
+                bne dp9
+                lda #\7
+                jmp dp7
+dp9             tax
+                jsr get
+                jmp dp8
+
+get             cpy $fc
+                bne ge1
+                dec $fd
+ge1             dec $fc
+                lda ($fc),y
+                rts
+put             sta ($fe),y
+                cpy $fe
+                bne pu1
+                dec $ff
+pu1             dec $fe
+                rts
+
+enddep
+.here
+
+packed_data
+.endm

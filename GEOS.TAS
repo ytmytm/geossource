@@ -1,0 +1,81 @@
+
+;GEOS Kernal makefile
+;by Maciej 'YTM/Alliance' Witkowiak
+;19,20-3-99; 20-4; 6-6
+
+;This is the makefile for GEOS KERNAL
+;read the comments
+
+;all GEOS Kernal equations...
+.include const.inc
+.include geossym.inc
+.include printdrv.inc
+.include geosmac.inc
+.include kernal.inc
+
+;rules for compiling
+.include equ.inc
+
+;some other includes needed sometimes
+	  .if (!use1541)
+	      .include diskdrv.inc
+	  .fi
+
+	  .if (!useJoystick)
+	      .include inputdrv.inc
+	  .fi
+
+;GEOS startup code
+		      *=InitKernal
+.include booter.tas
+
+;GEOS booting drive disk driver
+		      *=DISK_BASE
+
+	  .if use1541
+	      .include drv1541.tas
+	  .else
+	      .if use1571
+		  .binary drv1571.bin
+	      .else
+		  .if use1581
+		      .binary drv1581.bin
+		  .fi
+	      .fi
+	  .fi
+
+;lower part of Kernal
+		      *=DISK_BASE + DISK_DRV_LGH
+.include lokernal.tas
+
+;GEOS generic pointer shape, icons and Kernal code
+		      *=SCREEN_BASE+SC_SIZE
+.include icons.tas
+		      *=OS_ROM
+.include kernal1.tas
+.include kernal2.tas
+.include kernal3.tas
+.include kernal4.tas
+
+;GEOS generic input driver (used in auto-execs, before DeskTop boots up)
+		      *=MOUSE_JMP
+
+	  .if useJoystick
+	      .include joydrv.tas
+	  .else
+	      .if use1531
+		  .binary mse1531.bin
+	      .else
+		  .if useKoalaPad
+		      .binary koalapad.bin
+		  .else
+		      .if useLightPen
+			  .binary lightpen.bin
+		      .else
+			  .if usePCAnalogJoy
+			      .binary pcanalog.bin
+			  .fi
+		      .fi
+		  .fi
+	      .fi
+	  .fi

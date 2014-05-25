@@ -1,0 +1,3 @@
+
+- port to any GNU crossassembler (xa if it supports conditionals and macros)
+- make makefile for GNU make :-)
